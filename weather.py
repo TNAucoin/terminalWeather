@@ -2,6 +2,7 @@ import argparse
 import json
 import typing
 import sys
+import geocoder
 from configparser import ConfigParser
 from urllib import error, parse, request
 
@@ -15,7 +16,9 @@ def read_user_cli_args():
     parser = argparse.ArgumentParser(
         description="gets weather and temperature information for a city."
     )
-    parser.add_argument("city", nargs="+", type=str, help="enter the city name")
+    parser.add_argument(
+        "-c", "--city", nargs="+", type=str, help="enter the city name", required=False
+    )
     parser.add_argument(
         "-i",
         "--imperial",
@@ -25,8 +28,8 @@ def read_user_cli_args():
     return parser.parse_args()
 
 
-def build_weather_query(city_input: typing.List[str], imperial: bool = False):
-    """Builds the URL for an API request to OpenWeatherAPI
+def build_weather_query_with_city(city_input: typing.List[str], imperial: bool = False):
+    """Builds the URL for an API request to OpenWeatherAPI using city name
     Args:
         city_input (List[str]): Name of city
         imperial (boolean): Use imperial units for temp
@@ -40,6 +43,25 @@ def build_weather_query(city_input: typing.List[str], imperial: bool = False):
     url = (
         f"{BASE_WEATHER_API_URL}?q={url_encoded_city_name}"
         f"&units={units}&appid={api_key}"
+    )
+    return url
+
+
+def build_weather_query_with_lat_long(
+    lat_long: typing.List[str], imperial: bool = False
+):
+    """Builds the URL for an API request to OpenWeatherAPI using lat long
+    :arg
+        lat_long (List[str]): List containing the lat and long
+        imperial (boolean): Use imperial units for temp
+    :returns
+        str: URL formatted for call to OpenWeatherAPI
+    """
+    api_key = _get_api_key()
+    units = "imperial" if imperial else "metric"
+    url = (
+        f"{BASE_WEATHER_API_URL}?lat={lat_long[0]}"
+        f"&lon={lat_long[1]}&units={units}&appid={api_key}"
     )
     return url
 
@@ -76,9 +98,26 @@ def _get_api_key():
     return config["openweather"]["api_key"]
 
 
+def get_user_current_lat_lng():
+    """Gets the user's current lat long location
+    :returns
+        [str], list of latitude and longitude
+    """
+    g_location = geocoder.ip("me")
+    return g_location.latlng
+
+
 if __name__ == "__main__":
     user_args = read_user_cli_args()
-    query_url = build_weather_query(user_args.city, user_args.imperial)
+    query_url = None
+    if user_args.city:
+        query_url = build_weather_query_with_city(user_args.city, user_args.imperial)
+    else:
+        current_location = get_user_current_lat_lng()
+        query_url = build_weather_query_with_lat_long(
+            current_location, user_args.imperial
+        )
+
     weather_data = get_weather_data(query_url)
     print(
         f"{weather_data['name']}:"
