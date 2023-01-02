@@ -5,6 +5,7 @@ import sys
 import geocoder
 from configparser import ConfigParser
 from urllib import error, parse, request
+from clint.textui import puts, indent, colored
 
 BASE_WEATHER_API_URL = "http://api.openweathermap.org/data/2.5/weather"
 
@@ -107,6 +108,52 @@ def get_user_current_lat_lng():
     return g_location.latlng
 
 
+def weather_output_format(weather_data: dict, imperial: bool):
+    """Formats the weather data for human consumption
+    :returns
+        str: Human readable weather report
+    """
+    temperature = weather_data["main"]["temp"]
+
+    city_message = colored.blue(f"{weather_data['name']}")
+    weather_description_message = colored.white(
+        f"{weather_data['weather'][0]['description']}"
+    )
+    temperature_message = temp_color_display_format(temperature, imperial)(
+        temp_display_format(temperature, imperial)
+    )
+    with indent(4, quote=">>>"):
+        puts(f"[{city_message}]: {weather_description_message}, {temperature_message}")
+
+
+def temp_display_format(temperature: str, imperial: bool):
+    """Adjusts temperature display unit
+    :returns
+        str: Temp string with correct unit of measurement
+    """
+    return f"{temperature}°F" if imperial else f"{temperature}°C"
+
+
+def temp_color_display_format(temperature, imperial: bool):
+    """Colors corresponding to how hot or cold the temperature is
+    :returns
+        func(str): Function that sets the correct temp color on the string.
+    """
+
+    if imperial:
+        if temperature >= 90:
+            return colored.red
+        elif temperature <= 50:
+            return colored.cyan
+        return colored.yellow
+    else:
+        if temperature >= 32:
+            return colored.red
+        elif temperature <= 10:
+            return colored.cyan
+        return colored.yellow
+
+
 if __name__ == "__main__":
     user_args = read_user_cli_args()
     query_url = None
@@ -119,8 +166,4 @@ if __name__ == "__main__":
         )
 
     weather_data = get_weather_data(query_url)
-    print(
-        f"{weather_data['name']}:"
-        f"{weather_data['weather'][0]['description']}"
-        f"({weather_data['main']['temp']})"
-    )
+    weather_output_format(weather_data, user_args.imperial)
